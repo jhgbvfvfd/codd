@@ -44,29 +44,56 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
 
   return (
     <div className={`splash-screen ${fadeOut ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
-      <div className="tech-pattern absolute inset-0 opacity-20"></div>
-      <div className="absolute inset-0" style={{
-        backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232563eb' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
-        backgroundColor: "#121212",
-        backgroundSize: "60px 60px",
-      }}></div>
+      {/* Stylish gradient background with a radial glow instead of grid pattern */}
+      <div className="absolute inset-0 bg-gradient-to-br from-black via-[#180a29] to-[#24104d] opacity-95"></div>
+      
+      {/* Animated purple particles effect */}
+      <div className="absolute inset-0 digital-noise opacity-20"></div>
+      
+      {/* Stylish light rays */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-20">
+          <div className="absolute inset-0 rotate-0 animate-[spin_10s_linear_infinite]">
+            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent"></div>
+            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gradient-to-b from-transparent via-purple-500 to-transparent"></div>
+          </div>
+          <div className="absolute inset-0 rotate-45 animate-[spin_15s_linear_infinite]">
+            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-purple-600 to-transparent"></div>
+            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gradient-to-b from-transparent via-purple-600 to-transparent"></div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Main content */}
       <div className="relative z-10 flex flex-col items-center backdrop-blur-sm">
-        <div className="animate-bounce-limited mb-4 relative">
-          <div className="absolute inset-0 bg-blue-600/30 blur-xl rounded-full animate-pulse"></div>
-          <Logo />
+        {/* Logo with improved animation */}
+        <div className="mb-8 relative">
+          <div className="absolute inset-0 -m-4 bg-purple-600/20 blur-2xl rounded-full animate-pulse"></div>
+          <div className="animate-float">
+            <Logo />
+          </div>
         </div>
         
+        {/* Stylish terminal with purple highlights */}
         {showTerminal && (
-          <div className="mt-4 w-64 h-32 bg-gray-900/70 border border-blue-500/30 rounded-md p-2 overflow-hidden">
-            <pre className="text-left text-green-400 text-xs font-mono">{terminalText}</pre>
-            <span className="inline-block h-4 w-2 bg-green-400 ml-1 animate-pulse"></span>
+          <div className="mt-4 w-72 h-36 bg-gray-900/80 border border-purple-500/40 rounded-md p-3 overflow-hidden shadow-[0_0_15px_rgba(139,92,246,0.3)] backdrop-blur">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/70"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/70"></div>
+            </div>
+            <pre className="text-left text-purple-300 text-xs font-mono">{terminalText}</pre>
+            <span className="inline-block h-4 w-2 bg-purple-400 ml-1 animate-pulse"></span>
           </div>
         )}
         
-        <div className="mt-6">
-          <div className="loading-spinner"></div>
+        {/* Improved spinner */}
+        <div className="mt-8 relative">
+          <div className="loading-spinner border-purple-500 after:border-l-purple-500"></div>
+          <div className="absolute inset-0 rounded-full bg-purple-500/20 blur-md animate-pulse"></div>
         </div>
-        <div className="mt-4 text-blue-400 animate-pulse text-sm font-mono tracking-wider">SYSTEM LOADING...</div>
+        
+        <div className="mt-4 text-purple-300 animate-pulse text-sm font-mono tracking-wider">SYSTEM LOADING...</div>
       </div>
     </div>
   );
