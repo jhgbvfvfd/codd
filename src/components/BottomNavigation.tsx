@@ -23,11 +23,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiv
           className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
           onClick={() => setActiveTab(item.id)}
         >
-          <div className={`relative ${
-            activeTab === item.id 
-              ? 'before:absolute before:w-7 before:h-0.5 before:bg-white before:bottom-0 before:-mb-1.5 before:rounded-full before:left-1/2 before:-translate-x-1/2 before:shadow-[0_0_8px_rgba(255,255,255,0.8)]' 
-              : ''
-          }`}>
+          <div>
             <item.icon 
               size={18} 
               className={`nav-icon ${activeTab === item.id ? 'text-white' : ''} transition-all duration-300`} 
@@ -36,10 +32,6 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiv
           <span className="transition-all duration-300 text-[10px] font-mono tracking-wider mt-0.5">
             {item.label}
           </span>
-          
-          {activeTab === item.id && (
-            <span className="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 w-8 h-0.5 bg-white/70 rounded-full blur-sm"></span>
-          )}
         </button>
       ))}
     </div>

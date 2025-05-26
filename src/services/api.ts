@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://4c78f910-fb19-49ef-b670-077fb079f6f8-00-1qignk7q963ov.pike.replit.dev';
+const API_BASE_URL = 'https://apibottelegram.cyber-safe.cloud';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
