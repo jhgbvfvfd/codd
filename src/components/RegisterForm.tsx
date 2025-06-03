@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { submitPhone, initiateLoginBot, verifyBotOtp, generateApiKey } from '../services/api';
 import { isValidThaiPhone } from '../utils/validators';
@@ -9,13 +8,14 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from './ui/input-otp';
 const RegisterForm: React.FC = () => {
   // Form steps
   enum Step {
-    BotPhone = 1,
-    BotOTP = 2,
-    RegisterPhone = 3,
+    RegisterPhone = 1,
+    ApiKey = 2,
+    BotPhone = 3,
+    BotOTP = 4,
   }
 
   // States
-  const [currentStep, setCurrentStep] = useState<Step>(Step.BotPhone);
+  const [currentStep, setCurrentStep] = useState<Step>(Step.RegisterPhone);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -106,7 +106,43 @@ const RegisterForm: React.FC = () => {
     }
   };
 
-  // Step 3: Register phone with API key
+  // Step 1: Register phone with API key
+  const handleApiKeySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!apiKey.trim()) {
+      setError('กรุณากรอก API key');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // Submit phone and API key
+      const response = await submitPhone(phone, apiKey);
+      
+      if (response.success) {
+        setCurrentStep(Step.BotPhone);
+        Swal.fire({
+          icon: 'success',
+          title: 'บันทึก API Key สำเร็จ!',
+          text: 'กรุณากรอกเบอร์โทรศัพท์บอทเพื่อดำเนินการต่อ',
+          confirmButtonColor: '#3b82f6',
+          background: '#1e293b',
+          color: '#ffffff',
+        });
+      } else {
+        setError(response.message || 'เกิดข้อผิดพลาดในการบันทึก API Key กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (error) {
+      setError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองอีกครั้ง');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Step 1: Submit register phone
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -115,41 +151,8 @@ const RegisterForm: React.FC = () => {
       return;
     }
 
-    if (!apiKey.trim()) {
-      setError('กรุณากรอกหรือสร้าง API key');
-      return;
-    }
-
-    setIsLoading(true);
+    setCurrentStep(Step.ApiKey);
     setError('');
-
-    try {
-      const response = await submitPhone(phone, apiKey);
-      
-      if (response.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'ลงทะเบียนสำเร็จ!',
-          text: response.message || 'เบอร์โทรศัพท์ถูกลงทะเบียนในระบบแล้ว',
-          confirmButtonColor: '#3b82f6',
-          background: '#1e293b',
-          color: '#ffffff',
-        });
-        
-        // Reset all form
-        setPhone('');
-        setApiKey('');
-        setBotPhone('');
-        setCode('');
-        setCurrentStep(Step.BotPhone);
-      } else {
-        setError(response.message || 'เกิดข้อผิดพลาดในการลงทะเบียน กรุณาลองใหม่อีกครั้ง');
-      }
-    } catch (error) {
-      setError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองอีกครั้ง');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Resend OTP handler
@@ -184,13 +187,15 @@ const RegisterForm: React.FC = () => {
 
   // Go back step
   const handleBackStep = () => {
-    if (currentStep === Step.BotOTP) {
+    if (currentStep === Step.ApiKey) {
+      setCurrentStep(Step.RegisterPhone);
+      setApiKey('');
+    } else if (currentStep === Step.BotPhone) {
+      setCurrentStep(Step.ApiKey);
+      setBotPhone('');
+    } else if (currentStep === Step.BotOTP) {
       setCurrentStep(Step.BotPhone);
       setCode('');
-    } else if (currentStep === Step.RegisterPhone) {
-      setCurrentStep(Step.BotOTP);
-      setPhone('');
-      setApiKey('');
     }
     setError('');
   };
@@ -200,7 +205,7 @@ const RegisterForm: React.FC = () => {
   // Progress indicator
   const renderProgressIndicator = () => (
     <div className="flex justify-between mb-6">
-      {[Step.BotPhone, Step.BotOTP, Step.RegisterPhone].map((step) => (
+      {[Step.RegisterPhone, Step.ApiKey, Step.BotPhone, Step.BotOTP].map((step) => (
         <div 
           key={step} 
           className="flex flex-col items-center"
@@ -227,20 +232,26 @@ const RegisterForm: React.FC = () => {
               ? 'text-green-400'
               : 'text-gray-500'
           }`}>
-            {step === Step.BotPhone ? 'เบอร์บอท' : step === Step.BotOTP ? 'รหัส OTP' : 'ลงทะเบียน'}
+            {step === Step.RegisterPhone ? 'เบอร์รับซอง' : step === Step.ApiKey ? 'API Key' : step === Step.BotPhone ? 'เบอร์บอท' : 'รหัส OTP'}
           </span>
         </div>
       ))}
 
-      <div className="absolute left-1/4 top-11 w-1/4 h-0.5 bg-gray-700">
+      <div className="absolute left-[22%] top-11 w-[22%] h-0.5 bg-gray-700">
         <div className={`h-full bg-green-500 transition-all duration-300 ${
-          currentStep > Step.BotPhone ? 'w-full' : 'w-0'
+          currentStep > Step.RegisterPhone ? 'w-full' : 'w-0'
         }`}></div>
       </div>
 
-      <div className="absolute right-1/4 top-11 w-1/4 h-0.5 bg-gray-700">
+      <div className="absolute left-[44%] right-[44%] top-11 w-[22%] h-0.5 bg-gray-700">
         <div className={`h-full bg-green-500 transition-all duration-300 ${
-          currentStep > Step.BotOTP ? 'w-full' : 'w-0'
+          currentStep > Step.ApiKey ? 'w-full' : 'w-0'
+        }`}></div>
+      </div>
+
+      <div className="absolute right-[22%] top-11 w-[22%] h-0.5 bg-gray-700">
+        <div className={`h-full bg-green-500 transition-all duration-300 ${
+          currentStep > Step.BotPhone ? 'w-full' : 'w-0'
         }`}></div>
       </div>
     </div>
@@ -249,6 +260,54 @@ const RegisterForm: React.FC = () => {
   // Render current step
   const renderCurrentStep = () => {
     switch (currentStep) {
+      case Step.ApiKey:
+        return (
+          <form onSubmit={handleApiKeySubmit} className="space-y-5">
+            <div className="mb-4">
+              <label htmlFor="apiKey" className="form-label">
+                API Key
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400">
+                  <Key size={18} />
+                </div>
+                <input
+                  id="apiKey"
+                  type="text"
+                  className="form-input pl-10"
+                  placeholder="กรุณาใส่ API Key ที่ได้รับจากแอดมิน"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex justify-between text-xs text-gray-400 mt-2">
+                <button 
+                  type="button" 
+                  className="text-blue-500 hover:text-blue-400"
+                  onClick={handleBackStep}
+                >
+                  แก้ไขเบอร์รับซอง
+                </button>
+              </div>
+            </div>
+            
+            <button type="submit" className="btn-primary" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  กำลังบันทึก...
+                </>
+              ) : (
+                'บันทึก API Key'
+              )}
+            </button>
+          </form>
+        );
+
       case Step.BotPhone:
         return (
           <form onSubmit={handleBotPhoneSubmit} className="space-y-5">
@@ -369,35 +428,6 @@ const RegisterForm: React.FC = () => {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
-              </div>
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="apiKey" className="form-label">
-                API Key
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400">
-                  <Key size={18} />
-                </div>
-                <input
-                  id="apiKey"
-                  type="text"
-                  className="form-input pl-10"
-                  placeholder="กรุณาใส่ API Key ที่ได้รับจากแอดมิน"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </div>
-              
-              <div className="flex justify-between text-xs text-gray-400 mt-2">
-                <button 
-                  type="button" 
-                  className="text-blue-500 hover:text-blue-400"
-                  onClick={handleBackStep}
-                >
-                  กลับไปหน้าก่อนหน้า
-                </button>
               </div>
             </div>
             
