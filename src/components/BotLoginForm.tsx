@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
-import { initiateLoginBot, verifyBotOtp } from '../services/api';
+import { initiateBotLogin, verifyBotOtp } from '../services/api';
 import { isValidThaiPhone } from '../utils/validators';
 import { Smartphone, Key, ChevronRight, RefreshCw } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from './ui/input-otp';
 
-const BotLoginForm: React.FC = () => {
+const BotLoginForm: React.FC<{ apiKey: string }> = ({ apiKey }) => {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +28,8 @@ const BotLoginForm: React.FC = () => {
       // Format phone number if needed (ensure +66 format)
       const formattedPhone = phone.startsWith('+') ? phone : `+66${phone.slice(1)}`;
       
-      const response = await initiateLoginBot(formattedPhone);
+      console.log('[Debug] Calling initiateBotLogin with:', { formattedPhone, apiKey });
+      const response = await initiateBotLogin(formattedPhone, apiKey);
       
       if (response.success) {
         setAwaitingOtp(true);
@@ -66,7 +66,8 @@ const BotLoginForm: React.FC = () => {
       // Format phone number if needed (ensure +66 format)
       const formattedPhone = phone.startsWith('+') ? phone : `+66${phone.slice(1)}`;
       
-      const response = await verifyBotOtp(formattedPhone, code);
+      console.log('[Debug] Calling verifyBotOtp with:', { formattedPhone, code, apiKey });
+      const response = await verifyBotOtp(formattedPhone, code, apiKey);
       
       if (response.success) {
         Swal.fire({
@@ -100,7 +101,7 @@ const BotLoginForm: React.FC = () => {
       // Format phone number if needed (ensure +66 format)
       const formattedPhone = phone.startsWith('+') ? phone : `+66${phone.slice(1)}`;
       
-      const response = await initiateLoginBot(formattedPhone);
+      const response = await initiateBotLogin(formattedPhone, apiKey);
       
       if (response.success) {
         Swal.fire({

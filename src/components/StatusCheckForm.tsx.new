@@ -1,0 +1,295 @@
+import React, { useState, useEffect } from 'react';
+import { checkStatusByApiKey, checkStatusByPhone, checkTotalBots } from '../services/api';
+import { isValidThaiPhone, isValidApiKey, formatThaiDate, formatRemainingTime } from '../utils/validators';
+import Swal from 'sweetalert2';
+
+interface StatusData {
+  success: boolean;
+  message: string;
+  phone?: string;
+  totalAmount?: number;
+  expiresAt?: string;
+  botExpiresAt?: string;
+  apiKeyExpiresAt?: string;
+  botPhone?: string;
+  remainingTime?: {
+    days: number;
+    hours: number;
+    minutes: number;
+  };
+}
+
+const StatusCheckForm: React.FC = () => {
+  const [input, setInput] = useState('');
+  const [checkType, setCheckType] = useState<'phone' | 'apiKey'>('phone');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusData, setStatusData] = useState<StatusData | null>(null);
+  const [error, setError] = useState('');
+  const [showBotStatus, setShowBotStatus] = useState(false);
+  const [totalBots, setTotalBots] = useState<number | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [isOnline, setIsOnline] = useState(false);
+
+  useEffect(() => {
+    const fetchTotalBots = async () => {
+      try {
+        const response = await checkTotalBots();
+        if (response.success) {
+          setTotalBots(response.total);
+          setIsOnline(true);
+          setLastUpdated(new Date().toLocaleString('th-TH', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          }));
+        } else {
+          setIsOnline(false);
+          console.error('Failed to get total bots:', response.message);
+        }
+      } catch (error) {
+        console.error('Error fetching total bots:', error);
+        setIsOnline(false);
+      }
+    };
+
+    fetchTotalBots();
+    const interval = setInterval(fetchTotalBots, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const validateInput = (): boolean => {
+    setError('');
+
+    if (checkType === 'phone' && !isValidThaiPhone(input)) {
+      setError('เบอร์โทรศัพท์ไม่ถูกต้อง กรุณาใช้รูปแบบ 0[6-9]xxxxxxxx');
+      return false;
+    }
+
+    if (checkType === 'apiKey' && !isValidApiKey(input)) {
+      setError('กรุณากรอก API key');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateInput()) {
+      return;
+    }
+
+    setIsLoading(true);
+    setStatusData(null);
+
+    try {
+      let response;
+
+      if (checkType === 'apiKey') {
+        response = await checkStatusByApiKey(input);
+      } else {
+        response = await checkStatusByPhone(input);
+      }
+
+      if (response.success) {
+        setStatusData(response);
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'ไม่พบข้อมูล',
+          text: response.message || 'กรุณาตรวจสอบข้อมูลที่กรอกและลองใหม่อีกครั้ง',
+          confirmButtonColor: '#E21C23',
+        });
+      }
+    } catch (error) {
+      console.error('Error in form submission:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'เกิดข้อผิดพลาด',
+        text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองอีกครั้งในภายหลัง',
+        confirmButtonColor: '#E21C23',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="animate-fade-in">
+      {/* สถานะบอท */}
+      <div className="card-container mb-4">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">สถานะบอท</h2>
+          <div className="flex items-center space-x-2">
+            <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></span>
+            <span className="text-sm text-gray-400">{isOnline ? 'ออนไลน์' : 'ออฟไลน์'}</span>
+          </div>
+        </div>
+
+        <div className="bg-gray-700 rounded-lg p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-gray-300">จำนวนบอททั้งหมด:</span>
+            <span className="text-lg font-semibold text-purple-400">{totalBots !== null ? totalBots : '-'}</span>
+          </div>
+          {lastUpdated && (
+            <div className="text-xs text-gray-400 text-right">
+              อัพเดทล่าสุด: {lastUpdated}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ฟอร์มเช็คสถานะ */}
+      <div className="card-container">
+        <h2 className="text-xl font-bold mb-4">เช็คสถานะการดักซอง</h2>
+
+        {/* ปุ่มสลับโหมดการเช็ค */}
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
+              checkType === 'phone'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+            onClick={() => {
+              setCheckType('phone');
+              setInput('');
+              setError('');
+            }}
+          >
+            เช็คด้วยเบอร์โทร
+          </button>
+          <button
+            type="button"
+            className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
+              checkType === 'apiKey'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+            onClick={() => {
+              setCheckType('apiKey');
+              setInput('');
+              setError('');
+            }}
+          >
+            เช็คด้วย API Key
+          </button>
+        </div>
+
+        {/* ฟอร์มกรอกข้อมูล */}
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <div className="relative">
+              <input
+                type={checkType === 'phone' ? 'tel' : 'text'}
+                className={`w-full bg-gray-700 border ${
+                  error ? 'border-red-500' : 'border-gray-600'
+                } rounded-lg py-2 px-3 pl-10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder={
+                  checkType === 'phone'
+                    ? 'กรอกเบอร์โทรศัพท์ เช่น 0812345678'
+                    : 'กรอก API Key ของคุณ'
+                }
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={isLoading}
+              />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                {checkType === 'phone' ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
+            {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+            disabled={isLoading}
+          >
+            {isLoading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบสถานะ'}
+          </button>
+        </form>
+
+        {/* แสดงผลการเช็คสถานะ */}
+        {statusData && (
+          <div className="mt-6 bg-gray-700 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-4">ข้อมูลบอท</h3>
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-gray-400 mb-2">สถานะบอท:</h4>
+                <p className="text-green-400 font-semibold ml-4">ทำงานอยู่</p>
+              </div>
+
+              <div>
+                <h4 className="text-gray-400 mb-2">API Key:</h4>
+                <p className="text-white font-mono ml-4 break-all">{checkType === 'apiKey' ? input : '-'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-gray-400 mb-2">เบอร์รับเงิน:</h4>
+                <p className="text-white font-mono ml-4">{statusData.phone || '-'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-gray-400 mb-2">เบอร์โทรศัพท์บอท:</h4>
+                <p className="text-white font-mono ml-4">{statusData.botPhone || '-'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-gray-400 mb-2">ยอดรวมที่รับได้:</h4>
+                <p className="text-green-400 font-semibold ml-4">
+                  {statusData.totalAmount?.toLocaleString() || '0'} บาท
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-gray-400 mb-2">วันหมดอายุ:</h4>
+                <div className="ml-4 space-y-2">
+                  <div>
+                    <span className="text-gray-400">API Key:</span>
+                    <p className="text-yellow-400 ml-2">
+                      {statusData.apiKeyExpiresAt ? formatThaiDate(statusData.apiKeyExpiresAt) : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Bot Session:</span>
+                    <p className="text-yellow-400 ml-2">
+                      {statusData.botExpiresAt ? formatThaiDate(statusData.botExpiresAt) : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default StatusCheckForm;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { submitPhone, initiateLoginBot, verifyBotOtp, generateApiKey } from '../services/api';
+import { submitPhone, initiateBotLogin, verifyBotOtp, generateApiKey } from '../services/api';
 import { isValidThaiPhone } from '../utils/validators';
 import Swal from 'sweetalert2';
 import { Phone, Key, CheckCircle, RefreshCw } from 'lucide-react';
@@ -45,7 +45,7 @@ const RegisterForm: React.FC = () => {
       // Format phone number if needed (ensure +66 format)
       const formattedPhone = botPhone.startsWith('+') ? botPhone : `+66${botPhone.slice(1)}`;
       
-      const response = await initiateLoginBot(formattedPhone);
+      const response = await initiateBotLogin(formattedPhone, apiKey);
       
       if (response.success) {
         setCurrentStep(Step.BotOTP);
@@ -83,7 +83,8 @@ const RegisterForm: React.FC = () => {
       // Format phone number if needed (ensure +66 format)
       const formattedPhone = botPhone.startsWith('+') ? botPhone : `+66${botPhone.slice(1)}`;
       
-      const response = await verifyBotOtp(formattedPhone, code);
+      console.log('[Debug] Calling verifyBotOtp with:', { formattedPhone, code, apiKey });
+      const response = await verifyBotOtp(formattedPhone, code, apiKey);
       
       if (response.success) {
         setCurrentStep(Step.RegisterPhone);
@@ -164,7 +165,7 @@ const RegisterForm: React.FC = () => {
       // Format phone number if needed (ensure +66 format)
       const formattedPhone = botPhone.startsWith('+') ? botPhone : `+66${botPhone.slice(1)}`;
       
-      const response = await initiateLoginBot(formattedPhone);
+      const response = await initiateBotLogin(formattedPhone, apiKey);
       
       if (response.success) {
         Swal.fire({

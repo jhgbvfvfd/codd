@@ -1,0 +1,542 @@
+// IMPORTANT: This entire file, containing React component and JSX,
+// MUST be saved with a .tsx extension (e.g., App.tsx or SetupPage.tsx)
+// for Vite/SWC to correctly process the JSX syntax.
+
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { KeyRound, Phone, Bot, MessageSquare, CheckCircle, XCircle, LogIn, LogOut, Info, RefreshCw, Settings2, CircleDollarSign, LinkIcon, ChevronRight, Loader2, ClipboardCopy, ClipboardCheck } from 'lucide-react';
+
+// --- CRITICAL CONFIGURATION ---
+// IMPORTANT: Replace this with the *actual* URL where your Node.js server is running.
+const API_BASE_URL = 'https://7267948b-743f-4a51-bb4e-d5334845e279-00-3m2byn9ja8vm3.pike.replit.dev/'; // MAKE SURE THIS IS CORRECT
+// --- END CRITICAL CONFIGURATION ---
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 20000, 
+});
+
+const handleApiError = (error, functionName) => {
+  console.error(`Error in ${functionName}:`, error);
+  if (axios.isAxiosError(error)) {
+    if (error.response) {
+      console.error(`[${functionName}] Server Error:`, error.response.status, error.response.data);
+      return {
+        success: false,
+        message: error.response.data?.message || `เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: ${error.response.status}`,
+        errorData: error.response.data,
+      };
+    } else if (error.request) {
+      console.error(`[${functionName}] Network Error: No response received. Is server at ${API_BASE_URL} running?`, error.request);
+      return { success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ ตรวจสอบ URL และการเชื่อมต่อ' };
+    }
+    console.error(`[${functionName}] Request Setup Error:`, error.message);
+    return { success: false, message: `เกิดข้อผิดพลาดการตั้งค่าคำขอ: ${error.message}` };
+  }
+  console.error(`[${functionName}] Unknown Error:`, error);
+  return { success: false, message: `เกิดข้อผิดพลาดไม่ทราบสาเหตุใน ${functionName}: ${error.message}` };
+};
+
+// API Service Functions
+const generateNewApiKey = async (count = 1) => {
+  try {
+    const response = await api.get(`/generate-key?count=${count}`);
+    return response.data;
+  } catch (error) { return handleApiError(error, 'generateNewApiKey'); }
+};
+
+const submitClaimingPhoneWithApiKey = async (phone, apiKey) => {
+  try {
+    const response = await api.post('/submit-phone', { phone, apiKey });
+    return response.data;
+  } catch (error) { return handleApiError(error, 'submitClaimingPhoneWithApiKey'); }
+};
+
+const initiateBotLoginWithApiKey = async (telegramFormattedPhone, apiKey) => {
+  console.log('[Debug] Inside initiateBotLoginWithApiKey. Received apiKey:', `'${apiKey}'`); // Log received API key
+  if (!apiKey || apiKey.trim() === '') { // More robust check
+    const errorMsg = '[API Client - initiateLoginBot] API Key is required to initiate bot login and cannot be empty.';
+    console.error(errorMsg, 'Actual apiKey value received was falsy or empty string.');
+    return { success: false, message: errorMsg };
+  }
+  try {
+    const payload = { phone: telegramFormattedPhone, apiKey };
+    const response = await api.post('/bot-login', payload);
+    return response.data;
+  } catch (error) { return handleApiError(error, 'initiateBotLoginWithApiKey'); }
+};
+
+const verifyBotOtpWithApiKey = async (telegramFormattedPhone, code, apiKey) => {
+  console.log('[Debug] Inside verifyBotOtpWithApiKey. Received apiKey:', `'${apiKey}'`);
+  if (!apiKey || apiKey.trim() === '') { // More robust check
+    const errorMsg = '[API Client - verifyBotOtp] API Key is required to verify OTP and cannot be empty.';
+    console.error(errorMsg, 'Actual apiKey value received was falsy or empty string.');
+    return { success: false, message: errorMsg };
+  }
+  try {
+    const payload = { phone: telegramFormattedPhone, code, apiKey };
+    const response = await api.post('/bot-login', payload);
+    return response.data;
+  } catch (error) { return handleApiError(error, 'verifyBotOtpWithApiKey'); }
+};
+
+const checkStatusForApiKey = async (apiKey) => {
+  if (!apiKey || apiKey.trim() === '') {
+    return { success: false, message: 'Cannot check status: API Key is missing or empty.'}
+  }
+  try {
+    const response = await api.get(`/status/${apiKey}`);
+    return response.data;
+  } catch (error) { return handleApiError(error, 'checkStatusForApiKey'); }
+};
+
+const removeBotSessionForApiKey = async (apiKey) => {
+  if (!apiKey || apiKey.trim() === '') {
+    return { success: false, message: 'Cannot remove session: API Key is missing or empty.'}
+  }
+  try {
+    const response = await api.delete(`/remove-bot/${apiKey}`);
+    return response.data;
+  } catch (error) { return handleApiError(error, 'removeBotSessionForApiKey'); }
+};
+
+
+function App() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [generatedApiKey, setGeneratedApiKey] = useState('');
+  const [apiKeyForSetup, setApiKeyForSetup] = useState('');
+  const [claimingPhone, setClaimingPhone] = useState('');
+  const [botTelegramPhone, setBotTelegramPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [botStatusDetails, setBotStatusDetails] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const displayMessage = (msg, type) => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => { setMessage(''); setMessageType(''); }, 6000); // Longer display time
+  };
+
+  const copyToClipboard = (text) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => { setIsCopied(true); setTimeout(() => setIsCopied(false), 2000); })
+            .catch(err => { console.error('Copy failed:', err); fallbackCopyToClipboard(text); });
+    } else { fallbackCopyToClipboard(text); }
+  };
+
+  const fallbackCopyToClipboard = (text) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed'; document.body.appendChild(textArea);
+    textArea.focus(); textArea.select();
+    try { document.execCommand('copy'); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000); }
+    catch (err) { console.error('Fallback copy failed:', err); displayMessage('ไม่สามารถคัดลอกได้', 'error'); }
+    document.body.removeChild(textArea);
+  };
+
+  const handleGenerateApiKey = async () => {
+    setIsLoading(true); setMessage('');
+    console.log('[Debug] handleGenerateApiKey called');
+    const result = await generateNewApiKey();
+    if (result.success && result.apiKey) {
+      setGeneratedApiKey(result.apiKey);
+      setApiKeyForSetup(result.apiKey); 
+      console.log('[Debug] API Key generated and set for setup:', result.apiKey);
+      displayMessage('สร้าง API Key ใหม่สำเร็จ! คีย์นี้จะถูกใช้ในขั้นตอนต่อไป', 'success');
+      setCurrentStep(2); 
+    } else {
+      displayMessage(result.message || 'ไม่สามารถสร้าง API Key ได้', 'error');
+    }
+    setIsLoading(false);
+  };
+  
+  const handleUseExistingApiKey = (e) => {
+    e.preventDefault();
+    console.log('[Debug] handleUseExistingApiKey called with apiKeyForSetup:', `'${apiKeyForSetup}'`);
+    if (!apiKeyForSetup || apiKeyForSetup.trim() === '') {
+        displayMessage('กรุณากรอก API Key ที่มีอยู่ให้ถูกต้อง', 'error');
+        return;
+    }
+    // Optionally, you could try to validate the key here by fetching its status
+    // For now, just proceed. The server will validate it eventually.
+    console.log('[Debug] Proceeding to step 2 with existing API Key:', apiKeyForSetup);
+    setCurrentStep(2);
+  };
+
+  const handleRegisterClaimingPhone = async (e) => {
+    e.preventDefault();
+    console.log('[Debug] handleRegisterClaimingPhone called. apiKeyForSetup:', `'${apiKeyForSetup}'`, 'claimingPhone:', claimingPhone);
+    if (!claimingPhone || claimingPhone.trim() === '') {
+      displayMessage('กรุณากรอกเบอร์รับเงิน', 'error'); return;
+    }
+    if (!apiKeyForSetup || apiKeyForSetup.trim() === '') {
+      displayMessage('API Key ไม่ถูกต้อง กรุณากลับไปขั้นตอนที่ 1', 'error');
+      setCurrentStep(1); // Force back if API key somehow became empty
+      return;
+    }
+    setIsLoading(true); setMessage('');
+    const result = await submitClaimingPhoneWithApiKey(claimingPhone, apiKeyForSetup);
+    if (result.success) {
+      displayMessage(result.message || 'ลงทะเบียนเบอร์รับเงินสำเร็จ!', 'success');
+      setCurrentStep(3); 
+    } else {
+      displayMessage(result.message || 'ลงทะเบียนเบอร์รับเงินไม่สำเร็จ', 'error');
+    }
+    setIsLoading(false);
+  };
+
+  const handleInitiateBotLogin = async (e) => {
+    e.preventDefault();
+    console.log('[Debug] handleInitiateBotLogin triggered. apiKeyForSetup:', `'${apiKeyForSetup}'`, 'botTelegramPhone:', botTelegramPhone);
+
+    if (!botTelegramPhone || botTelegramPhone.trim() === '') {
+      displayMessage('กรุณากรอกเบอร์โทรศัพท์บอท', 'error');
+      console.log('[Debug] Bot Telegram Phone is missing or empty.');
+      return;
+    }
+    // Crucial check for apiKeyForSetup
+    if (!apiKeyForSetup || apiKeyForSetup.trim() === '') {
+      displayMessage('API Key ไม่ได้ถูกตั้งค่า หรือเป็นค่าว่าง กรุณากลับไปขั้นตอนที่ 1 หรือ 2 เพื่อตั้งค่า API Key', 'error');
+      console.error('[Debug] CRITICAL: apiKeyForSetup is missing or empty before calling API. Value:', `'${apiKeyForSetup}'`);
+      setCurrentStep(1); // Force user back to step 1 if API key is not properly set
+      return;
+    }
+
+    setIsLoading(true); setMessage('');
+    console.log('[Debug] Calling initiateBotLoginWithApiKey with botTelegramPhone:', botTelegramPhone, 'and valid apiKeyForSetup:', `'${apiKeyForSetup}'`);
+    const result = await initiateBotLoginWithApiKey(botTelegramPhone, apiKeyForSetup);
+    if (result.success) {
+      displayMessage(result.message || 'ส่ง OTP ไปยังเบอร์บอทแล้ว', 'success');
+      setCurrentStep(4);
+    } else {
+      displayMessage(result.message || 'ไม่สามารถส่ง OTP ได้', 'error');
+    }
+    setIsLoading(false);
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    console.log('[Debug] handleVerifyOtp triggered. apiKeyForSetup:', `'${apiKeyForSetup}'`, 'botTelegramPhone:', botTelegramPhone, 'otpCode:', otpCode);
+    if (!otpCode || otpCode.trim() === '') {
+      displayMessage('กรุณากรอก OTP', 'error'); return;
+    }
+    if (!apiKeyForSetup || apiKeyForSetup.trim() === '') { // Redundant check, but good for safety
+        displayMessage('API Key ไม่ได้ตั้งค่า กรุณาเริ่มใหม่', 'error');
+        setCurrentStep(1); return;
+    }
+    setIsLoading(true); setMessage('');
+    const result = await verifyBotOtpWithApiKey(botTelegramPhone, otpCode, apiKeyForSetup);
+    if (result.success) {
+      displayMessage(result.message || 'ล็อกอินบอทสำเร็จ!', 'success');
+      fetchBotStatus(apiKeyForSetup);
+      setCurrentStep(5); 
+    } else {
+      displayMessage(result.message || 'ยืนยัน OTP ไม่สำเร็จ', 'error');
+    }
+    setIsLoading(false);
+  };
+
+  const fetchBotStatus = async (key) => {
+    console.log('[Debug] fetchBotStatus called with key:', `'${key}'`);
+    if (!key || key.trim() === '') {
+        displayMessage('ไม่สามารถดึงสถานะได้: ไม่มี API Key', 'error');
+        setBotStatusDetails(null);
+        setCurrentStep(1); // Go back if no valid key
+        return;
+    }
+    setIsLoading(true);
+    const result = await checkStatusForApiKey(key);
+    if (result.success) {
+      setBotStatusDetails(result);
+    } else {
+      displayMessage(result.message || 'ไม่สามารถดึงสถานะบอทได้', 'error');
+      setBotStatusDetails(null);
+      if (result.message && (result.message.includes("หมดอายุ") || result.message.includes("ไม่พบ API key"))) {
+        console.log('[Debug] API Key invalid/expired during status fetch. Resetting apiKeyForSetup.');
+        setApiKeyForSetup(''); 
+        setCurrentStep(1); 
+      }
+    }
+    setIsLoading(false);
+  };
+  
+  const handleLogoutBot = async () => {
+    console.log('[Debug] handleLogoutBot called. apiKeyForSetup:', `'${apiKeyForSetup}'`);
+    if (!apiKeyForSetup || apiKeyForSetup.trim() === '') {
+        displayMessage('ไม่สามารถออกจากระบบได้: ไม่มี API Key', 'error');
+        setCurrentStep(1); return;
+    }
+    setIsLoading(true);
+    const result = await removeBotSessionForApiKey(apiKeyForSetup);
+    if (result.success) {
+        displayMessage(result.message || 'ออกจากระบบบอทสำเร็จ', 'success');
+        setBotStatusDetails(prev => prev ? {...prev, botSessionStatus: { active: false, telegramPhone: prev.botSessionStatus?.telegramPhone }} : null); 
+        setCurrentStep(3); // Go back to bot login details (can re-login)
+    } else {
+        displayMessage(result.message || 'ไม่สามารถออกจากระบบบอทได้', 'error');
+    }
+    setIsLoading(false);
+  };
+
+  const resetAndStartOver = () => {
+    console.log('[Debug] resetAndStartOver called');
+    setGeneratedApiKey(''); setApiKeyForSetup('');
+    setClaimingPhone(''); setBotTelegramPhone('');
+    setOtpCode(''); setBotStatusDetails(null);
+    setMessage(''); setMessageType('');
+    setCurrentStep(1);
+  };
+
+  const renderStep = () => {
+    // ... (The renderStep switch-case remains largely the same as before)
+    // Make sure the form onSubmit for "Use Existing API Key" is handleUseExistingApiKey
+    // Minor changes made to button disabled states to ensure apiKeyForSetup is checked.
+    switch (currentStep) {
+      case 1: // Generate/Enter API Key
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-semibold text-center text-purple-300 mb-1">ขั้นตอนที่ 1: API Key</h2>
+              <p className="text-center text-sm text-gray-400 mb-4">สร้าง API Key ใหม่ หรือกรอก API Key ที่คุณมี</p>
+            </div>
+            <button
+              onClick={handleGenerateApiKey}
+              disabled={isLoading}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50"
+            >
+              {isLoading && currentStep === 1 ? <Loader2 className="animate-spin mr-2" /> : <KeyRound className="mr-2" />} สร้าง API Key ใหม่
+            </button>
+            {generatedApiKey && (
+              <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+                <p className="text-sm text-gray-300">API Key ที่สร้างได้ (จะถูกใช้ขั้นตอนถัดไป):</p>
+                <div className="flex items-center justify-between">
+                    <span className="text-green-400 font-mono break-all">{generatedApiKey}</span>
+                    <button onClick={() => copyToClipboard(generatedApiKey)} className="ml-2 p-1 text-gray-400 hover:text-white">
+                        {isCopied ? <ClipboardCheck size={18} /> : <ClipboardCopy size={18} />}
+                    </button>
+                </div>
+              </div>
+            )}
+             <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-gray-600" /></div>
+                <div className="relative flex justify-center"><span className="bg-gray-800 px-2 text-sm text-gray-400">หรือ</span></div>
+            </div>
+            <form onSubmit={handleUseExistingApiKey} className="space-y-4"> {/* Changed onSubmit */}
+              <div>
+                <label htmlFor="apiKeyInput" className="block text-sm font-medium text-gray-300 mb-1">กรอก API Key ที่มีอยู่:</label>
+                <input
+                  id="apiKeyInput" type="text" value={apiKeyForSetup}
+                  onChange={(e) => { setGeneratedApiKey(''); setApiKeyForSetup(e.target.value); }} // Clear generated if typing
+                  placeholder="วาง API Key ของคุณที่นี่"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required />
+              </div>
+              <button
+                type="submit"
+                disabled={!apiKeyForSetup || apiKeyForSetup.trim() === '' || isLoading} // Ensure apiKeyForSetup is not just spaces
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50"
+              >
+                ใช้ API Key นี้ <ChevronRight className="ml-2" />
+              </button>
+            </form>
+          </div>
+        );
+      case 2: // Register Claiming Phone
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-center text-purple-300">ขั้นตอนที่ 2: ลงทะเบียนเบอร์รับเงิน</h2>
+            <p className="text-sm text-gray-400">API Key ที่จะใช้: <span className="font-mono text-purple-400 break-all">{apiKeyForSetup}</span></p>
+            <form onSubmit={handleRegisterClaimingPhone} className="space-y-4">
+              <div>
+                <label htmlFor="claimingPhone" className="block text-sm font-medium text-gray-300 mb-1 flex items-center">
+                  <Phone size={16} className="mr-2 text-green-400" /> เบอร์โทรศัพท์สำหรับรับเงิน (เช่น 08xxxxxxx)
+                </label>
+                <input
+                  id="claimingPhone" type="tel" pattern="0[0-9]{9}" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก ขึ้นต้นด้วย 0"
+                  value={claimingPhone} onChange={(e) => setClaimingPhone(e.target.value)}
+                  placeholder="0825658423"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required />
+              </div>
+              <button
+                type="submit" disabled={isLoading || !claimingPhone || claimingPhone.trim() === '' || !apiKeyForSetup || apiKeyForSetup.trim() === ''}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50"
+              >
+                {isLoading ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle className="mr-2" />} ลงทะเบียนเบอร์รับเงิน
+              </button>
+            </form>
+            <button onClick={() => { setClaimingPhone(''); setCurrentStep(1);}} className="text-sm text-gray-400 hover:text-purple-400 w-full text-center mt-2">ย้อนกลับ</button>
+          </div>
+        );
+      case 3: // Login Bot (Enter Bot Phone)
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-center text-purple-300">ขั้นตอนที่ 3: ล็อกอินบอท</h2>
+            <p className="text-sm text-gray-400">API Key ที่ใช้งาน: <span className="font-mono text-purple-400 break-all">{apiKeyForSetup}</span></p>
+            <p className="text-sm text-gray-400">เบอร์รับเงินที่ลงทะเบียน: <span className="font-mono text-green-400">{claimingPhone}</span></p>
+            <form onSubmit={handleInitiateBotLogin} className="space-y-4">
+              <div>
+                <label htmlFor="botTelegramPhone" className="block text-sm font-medium text-gray-300 mb-1 flex items-center">
+                  <Bot size={16} className="mr-2 text-blue-400" /> เบอร์โทรศัพท์ Telegram ของบอท (เช่น +669xxxxxxx)
+                </label>
+                <input
+                  id="botTelegramPhone" type="tel" pattern="\+66[0-9]{9}" title="กรุณากรอกเบอร์โทรศัพท์รูปแบบ +66 ตามด้วยเลข 9 หลัก"
+                  value={botTelegramPhone} onChange={(e) => setBotTelegramPhone(e.target.value)}
+                  placeholder="+66971432317"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required />
+              </div>
+              <button
+                type="submit" disabled={isLoading || !botTelegramPhone || botTelegramPhone.trim() === '' || !apiKeyForSetup || apiKeyForSetup.trim() === ''}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50"
+              >
+                {isLoading ? <Loader2 className="animate-spin mr-2" /> : <MessageSquare className="mr-2" />} ส่ง OTP ไปยังบอท
+              </button>
+            </form>
+            <button onClick={() => { setBotTelegramPhone(''); setOtpCode(''); setCurrentStep(2);}} className="text-sm text-gray-400 hover:text-purple-400 w-full text-center mt-2">ย้อนกลับ</button>
+          </div>
+        );
+      case 4: // Enter OTP
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-center text-purple-300">ขั้นตอนที่ 4: ยืนยัน OTP</h2>
+            <p className="text-sm text-gray-400">API Key: <span className="font-mono text-purple-400 break-all">{apiKeyForSetup}</span></p>
+            <p className="text-sm text-gray-400">กำลังล็อกอินบอท: <span className="font-mono text-blue-400">{botTelegramPhone}</span></p>
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div>
+                <label htmlFor="otpCode" className="block text-sm font-medium text-gray-300 mb-1 flex items-center">
+                  <KeyRound size={16} className="mr-2 text-yellow-400" /> รหัส OTP ที่ได้รับทาง Telegram
+                </label>
+                <input
+                  id="otpCode" type="text" pattern="[0-9]{5,6}" title="กรุณากรอกรหัส OTP 5-6 หลัก"
+                  value={otpCode} onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="12345"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required />
+              </div>
+              <button
+                type="submit" disabled={isLoading || !otpCode || otpCode.trim() === '' || !apiKeyForSetup || apiKeyForSetup.trim() === ''}
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-semibold py-3 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-75 transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50"
+              >
+                {isLoading ? <Loader2 className="animate-spin mr-2" /> : <LogIn className="mr-2" />} ยืนยัน OTP และล็อกอินบอท
+              </button>
+            </form>
+            <button onClick={() => {setOtpCode(''); setCurrentStep(3);}} className="text-sm text-gray-400 hover:text-purple-400 w-full text-center mt-2">ย้อนกลับ/แก้ไขเบอร์บอท</button>
+          </div>
+        );
+      case 5: // Bot Active Status
+        if (!botStatusDetails && isLoading) { // Show loader only if actively loading
+          return ( <div className="text-center"><Loader2 className="animate-spin text-purple-400 mx-auto mb-2" size={32}/><p className="text-gray-300">กำลังโหลดสถานะบอท...</p></div> );
+        }
+        if (!botStatusDetails) { // If not loading and no details (e.g. initial load failed or cleared)
+             return (
+                <div className="text-center">
+                    <XCircle className="text-red-400 mx-auto mb-2" size={32}/>
+                    <p className="text-gray-300 mb-3">ไม่สามารถโหลดสถานะบอทได้ หรือยังไม่ได้ตั้งค่า</p>
+                    <button onClick={() => fetchBotStatus(apiKeyForSetup)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md">
+                        <RefreshCw size={16} className="inline mr-1" /> ลองโหลดใหม่
+                    </button>
+                    <button onClick={resetAndStartOver} className="block text-sm text-gray-400 hover:text-purple-400 w-full text-center mt-4">
+                        <Settings2 size={16} className="inline mr-1" /> เริ่มการตั้งค่าใหม่ทั้งหมด
+                    </button>
+                </div>
+            );
+        }
+        const isActiveBot = botStatusDetails.botSessionStatus && botStatusDetails.botSessionStatus.active;
+        return (
+          <div className="space-y-4 text-sm">
+            <h2 className={`text-2xl font-semibold text-center mb-4 ${isActiveBot ? 'text-green-400' : 'text-red-400'}`}>
+              {isActiveBot ? <CheckCircle className="inline mr-2" /> : <XCircle className="inline mr-2" />}
+              สถานะบอท: {isActiveBot ? "ทำงานอยู่" : "ไม่ได้ทำงาน / หมดอายุ"}
+            </h2>
+            <div className="p-4 bg-gray-700 rounded-lg shadow">
+                <InfoItem label="API Key" value={apiKeyForSetup} isMono={true} canCopy={true} />
+                <InfoItem label="เบอร์รับเงิน" value={botStatusDetails.claimingPhone || claimingPhone} isMono={true} color="text-green-400" />
+                {botStatusDetails.botSessionStatus && typeof botStatusDetails.botSessionStatus === 'object' && botStatusDetails.botSessionStatus.telegramPhone &&
+                    <InfoItem label="เบอร์โทรศัพท์บอท" value={botStatusDetails.botSessionStatus.telegramPhone} isMono={true} color="text-blue-400" /> }
+                <InfoItem label="ยอดรวมที่รับได้" value={`${botStatusDetails.totalAmount || 0} บาท`} color="text-yellow-400" />
+                <h3 className="text-md font-semibold text-purple-300 mt-3 mb-1">วันหมดอายุ:</h3>
+                <InfoItem label="API Key" value={new Date(botStatusDetails.apiKeyExpiresAt).toLocaleString('th-TH')} />
+                {botStatusDetails.botSessionStatus && typeof botStatusDetails.botSessionStatus === 'object' && botStatusDetails.botSessionStatus.sessionExpiresAt &&
+                     <InfoItem label="Bot Session" value={new Date(botStatusDetails.botSessionStatus.sessionExpiresAt).toLocaleString('th-TH')} /> }
+                {typeof botStatusDetails.botSessionStatus === 'string' &&
+                    <p className="text-gray-400">สถานะ Bot Session: <span className="text-orange-400">{botStatusDetails.botSessionStatus}</span></p> }
+            </div>
+            <div className="flex space-x-2 mt-6">
+                <button onClick={() => fetchBotStatus(apiKeyForSetup)} disabled={isLoading}
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md flex items-center justify-center disabled:opacity-50">
+                    {isLoading && !botStatusDetails ? <Loader2 className="animate-spin mr-2" /> : <RefreshCw className="mr-2" />} รีเฟรช
+                </button>
+                {isActiveBot && (
+                    <button onClick={handleLogoutBot} disabled={isLoading}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md flex items-center justify-center disabled:opacity-50">
+                        {isLoading && botStatusDetails ? <Loader2 className="animate-spin mr-2" /> : <LogOut className="mr-2" />} ออกจากระบบบอท
+                    </button>
+                )}
+            </div>
+            <button onClick={resetAndStartOver} className="text-sm text-gray-400 hover:text-purple-400 w-full text-center mt-4">
+                <Settings2 size={16} className="inline mr-1" /> เริ่มการตั้งค่าใหม่ทั้งหมด
+            </button>
+          </div>
+        );
+      default: return <p>ขั้นตอนไม่ถูกต้อง</p>;
+    }
+  };
+  
+  const InfoItem = ({ label, value, isMono = false, color = 'text-gray-200', canCopy = false }) => {
+    // Logic to decide if current copied text matches this item's value for icon state
+    const isCurrentlyCopied = isCopied && ((canCopy && isMono && value === apiKeyForSetup) || (canCopy && !isMono && value === value)); // Simplified
+    return (
+        <div className="flex justify-between items-center py-1 border-b border-gray-600 last:border-b-0">
+        <span className="text-gray-400">{label}:</span>
+        <div className="flex items-center">
+            <span className={`${color} ${isMono ? 'font-mono' : ''} text-right break-all max-w-[150px] sm:max-w-xs truncate`} title={value}>{value}</span>
+            {canCopy && value && (
+            <button onClick={() => copyToClipboard(value)} className="ml-2 p-1 text-gray-500 hover:text-white">
+                {isCurrentlyCopied ? <ClipboardCheck size={16} /> : <ClipboardCopy size={16} />}
+            </button>
+            )}
+        </div>
+        </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-4 selection:bg-purple-500 selection:text-white">
+      <div className="w-full max-w-md bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl">
+        <div className="flex flex-col items-center mb-6">
+          <div className="bg-purple-600 p-3 rounded-full shadow-lg mb-3"><LinkIcon size={32} className="text-white" /></div>
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">TrueMoney Bot Setup</h1>
+          <p className="text-gray-400 text-sm mt-1">ตั้งค่าบอทรับซอง TrueMoney อัตโนมัติ</p>
+        </div>
+        <div className="flex justify-between items-center mb-8 px-2">
+            {[1,2,3,4,5].map(stepNum => (
+                <React.Fragment key={stepNum}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${currentStep >= stepNum ? 'bg-purple-600 border-purple-500 text-white' : 'bg-gray-700 border-gray-600 text-gray-400'}`}>
+                        {currentStep > stepNum ? <CheckCircle size={16}/> : stepNum}
+                    </div>
+                    {stepNum < 5 && <div className={`flex-1 h-1 mx-1 transition-all duration-300 ${currentStep > stepNum ? 'bg-purple-500' : 'bg-gray-600'}`}></div>}
+                </React.Fragment>
+            ))}
+        </div>
+        {message && (
+          <div className={`p-3 mb-4 rounded-lg text-sm text-center ${messageType === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'} shadow`}>
+            {messageType === 'success' ? <CheckCircle className="inline mr-2" /> : <XCircle className="inline mr-2" />} {message}
+          </div>
+        )}
+        {renderStep()}
+      </div>
+      <footer className="mt-8 text-center text-xs text-gray-500">
+        <p>API Base URL: <span className="font-mono">{API_BASE_URL}</span></p>
+        <p>&copy; {new Date().getFullYear()} Cybersafe Gift TW v2.1 Setup.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;

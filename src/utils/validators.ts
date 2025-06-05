@@ -1,4 +1,3 @@
-
 // Validate Thai phone number format (start with 06, 08, or 09, total 10 digits)
 export const isValidThaiPhone = (phone: string): boolean => {
   const pattern = /^0[6-9]\d{8}$/;
@@ -10,25 +9,31 @@ export const isValidApiKey = (apiKey: string): boolean => {
   return apiKey.trim().length > 0;
 };
 
-// Format date to Thai format
-export const formatThaiDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const options: Intl.DateTimeFormatOptions = { 
-    year: 'numeric', 
-    month: 'short', 
+// Format date to Thai format with Buddhist Era
+export const formatThaiDate = (input: string | Date): string => {
+  const date = input instanceof Date ? input : new Date(input);
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
   };
-  
-  // Convert to Buddhist era (BE) - add 543 years
-  const thaiDate = new Intl.DateTimeFormat('th-TH', options).format(date);
-  
-  // Replace AD year with BE year
+
+  const thaiDate = date.toLocaleString('th-TH', options);
   const adYear = date.getFullYear();
   const beYear = adYear + 543;
   
-  return thaiDate.replace(adYear.toString(), beYear.toString());
+  // Replace AD year with BE year and format according to the specified pattern
+  const formattedDate = thaiDate.replace(adYear.toString(), beYear.toString());
+  
+  // Restructure the date to match the desired format: d/m/yyyy hh:mm:ss
+  const [datePart, timePart] = formattedDate.split(' ');
+  const [day, month, year] = datePart.split('/');
+  
+  return `${day}/${month}/${year} ${timePart}`;
 };
 
 // Format remaining time
