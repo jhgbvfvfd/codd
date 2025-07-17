@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = 'https://apibottelegram.cyber-safe.cloud/';
+const DELETE_LIMIT_API_URL = 'https://api.cyber-safe.cloud/';
 
 interface StatusResponse {
   success: boolean;
@@ -70,10 +71,62 @@ export const generateApiKey = async (count = 1) => {
 };
 
 export const submitPhone = async (phone: string, apiKey: string) => {
+  // Validate inputs
+  if (!phone || phone.trim() === '') {
+    return { success: false, message: 'เบอร์โทรศัพท์ไม่ถูกต้อง' };
+  }
+  if (!apiKey || apiKey.trim() === '') {
+    return { success: false, message: 'API Key ไม่ถูกต้อง' };
+  }
+
   try {
-    const response = await api.post('/submit-phone', { phone, apiKey });
-    return response.data;
-  } catch (error) {
+    // First get a new API key from the original API
+    const generateResponse = await api.get('/generate-key?count=1');
+    const responseData = generateResponse.data as { key?: string };
+    const newApiKey = responseData?.key;
+    
+    if (!newApiKey) {
+      return { 
+        success: false, 
+        message: 'ไม่สามารถสร้าง API Key ใหม่ได้ กรุณาลองใหม่อีกครั้ง'
+      };
+    }
+
+    // Proceed with phone submission using the new key
+    console.log('[submitPhone] Using new API key, submitting phone:', {
+      phone: phone,
+      apiKey: newApiKey.substring(0, 5) + '...'
+    });
+
+    const response = await api.post('/submit-phone', { 
+      phone: phone.trim(),
+      apiKey: newApiKey
+    });
+
+    return {
+      success: true,
+      message: 'บันทึกข้อมูลสำเร็จ',
+      ...response.data as Record<string, any>
+    };
+  } catch (error: any) {
+    // If it's a fetch error from key validation
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error('[submitPhone] Key validation error:', error);
+      return {
+        success: false,
+        message: 'ไม่สามารถตรวจสอบ API Key กรุณาลองใหม่อีกครั้ง'
+      };
+    }
+    
+    // If it's an API error
+    if (error.response?.data) {
+      console.log('[submitPhone] Server error details:', error.response.data);
+      return {
+        success: false,
+        message: error.response.data.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง'
+      };
+    }
+
     return handleApiError(error, 'submitPhone');
   }
 };
@@ -195,6 +248,34 @@ export const checkTotalBots = async (): Promise<TotalBotsResponse> => {
       success: false,
       message: 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
       onlineBotCount: 0
+    };
+  }
+};
+
+export const deleteLimit = async (key: string, amount: number) => {
+  if (!key || key.trim() === '') {
+    return { success: false, message: 'Cannot delete limit: Key is missing or empty.' };
+  }
+  try {
+    // Create a new axios instance for this specific endpoint
+    const response = await fetch(`https://api.cyber-safe.cloud/api/deletelimit/${key.trim()}/${amount}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('[deleteLimit] Error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
 };
