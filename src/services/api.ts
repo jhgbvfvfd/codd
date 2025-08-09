@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://50e70278-7c1d-479c-8a70-89dc420a02a4-00-2u2qeif2a9fqf.sisko.replit.dev:3000/';
-const DELETE_LIMIT_API_URL = 'https://50e70278-7c1d-479c-8a70-89dc420a02a4-00-2u2qeif2a9fqf.sisko.replit.dev:3000/';
+const API_BASE_URL = 'https://apibottelegram.cyber-safe.cloud/';
+const DELETE_LIMIT_API_URL = 'https://apibottelegram.cyber-safe.cloud/';
 
 interface StatusResponse {
   success: boolean;
