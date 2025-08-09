@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://apibottelegram.cyber-safe.cloud/';
-const DELETE_LIMIT_API_URL = 'https://api.cyber-safe.cloud/';
+const API_BASE_URL = 'https://50e70278-7c1d-479c-8a70-89dc420a02a4-00-2u2qeif2a9fqf.sisko.replit.dev:3000/';
+const DELETE_LIMIT_API_URL = 'https://50e70278-7c1d-479c-8a70-89dc420a02a4-00-2u2qeif2a9fqf.sisko.replit.dev:3000/';
 
 interface StatusResponse {
   success: boolean;
@@ -24,7 +24,7 @@ interface TotalBotsResponse {
   onlineBotCount: number;
 }
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -80,27 +80,14 @@ export const submitPhone = async (phone: string, apiKey: string) => {
   }
 
   try {
-    // First get a new API key from the original API
-    const generateResponse = await api.get('/generate-key?count=1');
-    const responseData = generateResponse.data as { key?: string };
-    const newApiKey = responseData?.key;
-    
-    if (!newApiKey) {
-      return { 
-        success: false, 
-        message: 'ไม่สามารถสร้าง API Key ใหม่ได้ กรุณาลองใหม่อีกครั้ง'
-      };
-    }
-
-    // Proceed with phone submission using the new key
-    console.log('[submitPhone] Using new API key, submitting phone:', {
+    console.log('[submitPhone] Submitting phone with provided API key:', {
       phone: phone,
-      apiKey: newApiKey.substring(0, 5) + '...'
+      apiKey: apiKey.substring(0, 5) + '...'
     });
 
     const response = await api.post('/submit-phone', { 
       phone: phone.trim(),
-      apiKey: newApiKey
+      apiKey: apiKey.trim()
     });
 
     return {
