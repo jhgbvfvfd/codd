@@ -1,4 +1,4 @@
-'https axios from 'axios';
+import axios from 'axios';
 
 const API_BASE_URL = 'https://menu.panelaimbot.com/';
 const DELETE_LIMIT_API_URL = 'https://menu.panelaimbot.com/';
