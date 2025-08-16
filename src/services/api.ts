@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://menu.panelaimbot.com/';
-const DELETE_LIMIT_API_URL = 'https://menu.panelaimbot.com/';
+const API_BASE_URL = 'https://api.cyber-safe.cloud/';
+const DELETE_LIMIT_API_URL = 'https://api.cyber-safe.cloud/';
 
 interface StatusResponse {
   success: boolean;
